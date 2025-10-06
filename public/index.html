@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>Endless Song</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #0b0b0b; color: #f5f5f5; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol; }
+      .wrap { height: 100%; display: grid; place-items: center; }
+      button { appearance: none; background: #1f1f1f; color: #fff; border: 1px solid #2e2e2e; border-radius: 9999px; padding: 14px 22px; font-size: 16px; cursor: pointer; box-shadow: 0 0 0 3px rgba(255,255,255,0.05) inset; transition: transform .05s ease, background .2s ease, box-shadow .2s ease; }
+      button:hover { background: #2a2a2a; }
+      button:active { transform: scale(0.98); }
+      .hint { margin-top: 12px; opacity: .7; font-size: 14px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <button id="toggle">Play</button>
+        <div class="hint">Autoplay is blocked by browsers. Click once to start. It will loop forever.</div>
+      </div>
+    </div>
+
+    <audio id="player" src="./song.mp3" preload="auto" loop></audio>
+
+    <script>
+      const btn = document.getElementById('toggle');
+      const player = document.getElementById('player');
+      let started = false;
+
+      async function startPlayback() {
+        try {
+          await player.play();
+          started = true;
+          btn.textContent = 'Pause';
+        } catch (e) {
+          btn.textContent = 'Play (click again)';
+        }
+      }
+
+      btn.addEventListener('click', async () => {
+        if (!started) {
+          await startPlayback();
+          return;
+        }
+        if (player.paused) {
+          await player.play();
+          btn.textContent = 'Pause';
+        } else {
+          player.pause();
+          btn.textContent = 'Play';
+        }
+      });
+
+      // Try to resume if tab regains focus or after user interactions
+      const resume = async () => {
+        if (!started) return;
+        if (player.paused) {
+          try { await player.play(); } catch {}
+        }
+      };
+      window.addEventListener('focus', resume);
+      document.addEventListener('visibilitychange', resume);
+    </script>
+  </body>
+</html>
