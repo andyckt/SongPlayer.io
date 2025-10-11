@@ -4,10 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
-    <title>Endless Song</title>
+    <title>Song Player</title>
     <style>
       html, body { height: 100%; margin: 0; background: #0b0b0b; color: #f5f5f5; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol; }
-      .wrap { height: 100%; display: grid; place-items: center; }
+      .wrap { height: 100%; display: flex; justify-content: center; align-items: center; padding: 20px; }
+      .songs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; max-width: 1000px; width: 100%; }
+      .song-card { background: #1a1a1a; border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; transition: transform .1s ease, background .2s ease; border: 2px solid transparent; }
+      .song-card:hover { background: #222; }
+      .song-card.active { border-color: #3a86ff; }
+      .song-title { font-size: 16px; margin: 12px 0 0; font-weight: 500; }
       button { appearance: none; background: #1f1f1f; color: #fff; border: 1px solid #2e2e2e; border-radius: 9999px; padding: 14px 22px; font-size: 16px; cursor: pointer; box-shadow: 0 0 0 3px rgba(255,255,255,0.05) inset; transition: transform .05s ease, background .2s ease, box-shadow .2s ease; }
       button:hover { background: #2a2a2a; }
       button:active { transform: scale(0.98); }
@@ -16,43 +21,49 @@
   </head>
   <body>
     <div class="wrap">
-      <div>
-        <button id="toggle">Play</button>
-        <span style="margin-left:12px">船票</span>
-        <div class="hint">Autoplay is blocked by browsers. Click once to start. It will loop forever.</div>
+      <div style="width: 100%; max-width: 1000px;">
+        <div class="songs-grid" id="songs-grid"></div>
       </div>
     </div>
 
-    <audio id="player" src="./public/song.mp3" preload="auto" loop></audio>
+    <audio id="player" preload="auto" loop></audio>
 
     <script>
-      const btn = document.getElementById('toggle');
+      const songs = [
+        { title: "船票", src: "./public/song.mp3" },
+        { title: "Crying", src: "./public/SaveTik.co_7505711974253874489.mp3" }
+      ];
+      let currentSongIndex = 0;
+      // Track clicks for double-tap detection
+      let lastClickTime = 0;
+      let lastClickedIndex = -1;
+      const songsGrid = document.getElementById('songs-grid');
       const player = document.getElementById('player');
       let started = false;
 
+      function loadSong(index) {
+        currentSongIndex = index;
+        player.src = songs[currentSongIndex].src;
+        
+        // Update active song in the grid
+        document.querySelectorAll('.song-card').forEach((card, i) => {
+          if (i === currentSongIndex) {
+            card.classList.add('active');
+          } else {
+            card.classList.remove('active');
+          }
+        });
+      }
+
       async function startPlayback() {
+        if (!player.src) loadSong(currentSongIndex);
         try {
           await player.play();
           started = true;
-          btn.textContent = 'Pause';
         } catch (e) {
-          btn.textContent = 'Play (click again)';
+          console.error('Failed to play:', e);
         }
       }
-
-      btn.addEventListener('click', async () => {
-        if (!started) {
-          await startPlayback();
-          return;
-        }
-        if (player.paused) {
-          await player.play();
-          btn.textContent = 'Pause';
-        } else {
-          player.pause();
-          btn.textContent = 'Play';
-        }
-      });
 
       // Try to resume if tab regains focus or after user interactions
       const resume = async () => {
@@ -63,6 +74,53 @@
       };
       window.addEventListener('focus', resume);
       document.addEventListener('visibilitychange', resume);
+
+      // Create song cards
+      songs.forEach((song, index) => {
+        const card = document.createElement('div');
+        card.className = 'song-card';
+        if (index === currentSongIndex) card.classList.add('active');
+        
+        card.innerHTML = `
+          <div class="song-icon" style="font-size: 32px;">🎵</div>
+          <div class="song-title">${song.title}</div>
+        `;
+        
+        card.addEventListener('click', async () => {
+          const now = new Date().getTime();
+          const timeSinceLastClick = now - lastClickTime;
+          
+          // Load the song if it's not the current one
+          if (index !== currentSongIndex) {
+            loadSong(index);
+          }
+          
+          // Double-tap detection (within 300ms)
+          if (timeSinceLastClick < 300 && lastClickedIndex === index) {
+            // Double-tap - play the song
+            if (player.paused) {
+              if (!started) {
+                await startPlayback();
+              } else {
+                await player.play();
+              }
+            }
+          } else if (!player.paused && currentSongIndex === index) {
+            // Single-tap on playing song - pause it
+            player.pause();
+          }
+          
+          // Update tracking variables
+          lastClickTime = now;
+          lastClickedIndex = index;
+        });
+        
+        songsGrid.appendChild(card);
+      });
+      
+      // Initialize the first song
+      loadSong(0);
     </script>
   </body>
 </html>
+
