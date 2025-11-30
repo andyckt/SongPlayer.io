@@ -26,6 +26,13 @@
       </div>
     </div>
 
+    <div id="media-container" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center;">
+      <div style="position: relative; width: 80%; max-width: 1200px;">
+        <button id="close-video" style="position: absolute; top: -40px; right: 0; background: #ff3b3b; border: none;">Close</button>
+        <video id="video-player" controls style="width: 100%; display: none;"></video>
+      </div>
+    </div>
+    
     <audio id="player" preload="auto" loop></audio>
 
     <script>
@@ -47,9 +54,42 @@
       const player = document.getElementById('player');
       let started = false;
 
+      function isVideoFile(filename) {
+        return filename.toLowerCase().endsWith('.mp4') || 
+               filename.toLowerCase().endsWith('.webm') || 
+               filename.toLowerCase().endsWith('.mov');
+      }
+
       function loadSong(index) {
         currentSongIndex = index;
-        player.src = songs[currentSongIndex].src;
+        const src = songs[currentSongIndex].src;
+        const isVideo = isVideoFile(src);
+        
+        if (isVideo) {
+          // For video files
+          const videoPlayer = document.getElementById('video-player');
+          const mediaContainer = document.getElementById('media-container');
+          
+          player.pause();
+          player.src = '';
+          
+          videoPlayer.src = src;
+          videoPlayer.style.display = 'block';
+          mediaContainer.style.display = 'flex';
+        } else {
+          // For audio files
+          const videoPlayer = document.getElementById('video-player');
+          const mediaContainer = document.getElementById('media-container');
+          
+          if (videoPlayer.src) {
+            videoPlayer.pause();
+            videoPlayer.src = '';
+          }
+          
+          videoPlayer.style.display = 'none';
+          mediaContainer.style.display = 'none';
+          player.src = src;
+        }
         
         // Update active song in the grid
         document.querySelectorAll('.song-card').forEach((card, i) => {
@@ -62,9 +102,14 @@
       }
 
       async function startPlayback() {
-        if (!player.src) loadSong(currentSongIndex);
+        if (!player.src && !document.getElementById('video-player').src) loadSong(currentSongIndex);
+        
         try {
-          await player.play();
+          if (isVideoFile(songs[currentSongIndex].src)) {
+            await document.getElementById('video-player').play();
+          } else {
+            await player.play();
+          }
           started = true;
         } catch (e) {
           console.error('Failed to play:', e);
@@ -74,7 +119,13 @@
       // Try to resume if tab regains focus or after user interactions
       const resume = async () => {
         if (!started) return;
-        if (player.paused) {
+        
+        if (isVideoFile(songs[currentSongIndex].src)) {
+          const videoPlayer = document.getElementById('video-player');
+          if (videoPlayer.paused && document.getElementById('media-container').style.display === 'flex') {
+            try { await videoPlayer.play(); } catch {}
+          }
+        } else if (player.paused) {
           try { await player.play(); } catch {}
         }
       };
@@ -87,8 +138,9 @@
         card.className = 'song-card';
         if (index === currentSongIndex) card.classList.add('active');
         
+        const isVideo = isVideoFile(song.src);
         card.innerHTML = `
-          <div class="song-icon" style="font-size: 32px;">🎵</div>
+          <div class="song-icon" style="font-size: 32px;">${isVideo ? '🎬' : '🎵'}</div>
           <div class="song-title">${song.title}</div>
         `;
         
@@ -103,17 +155,40 @@
           
           // Double-tap detection (within 300ms)
           if (timeSinceLastClick < 300 && lastClickedIndex === index) {
-            // Double-tap - play the song
-            if (player.paused) {
-              if (!started) {
-                await startPlayback();
-              } else {
-                await player.play();
+            // Double-tap - play the song/video
+            const isVideo = isVideoFile(songs[index].src);
+            const videoPlayer = document.getElementById('video-player');
+            
+            if (isVideo) {
+              if (videoPlayer.paused) {
+                if (!started) {
+                  await startPlayback();
+                } else {
+                  await videoPlayer.play();
+                }
+              }
+            } else {
+              if (player.paused) {
+                if (!started) {
+                  await startPlayback();
+                } else {
+                  await player.play();
+                }
               }
             }
-          } else if (!player.paused && currentSongIndex === index) {
-            // Single-tap on playing song - pause it
-            player.pause();
+          } else if (currentSongIndex === index) {
+            // Single-tap on playing song/video - pause it
+            const isVideo = isVideoFile(songs[index].src);
+            if (isVideo) {
+              const videoPlayer = document.getElementById('video-player');
+              if (!videoPlayer.paused) {
+                videoPlayer.pause();
+              }
+            } else {
+              if (!player.paused) {
+                player.pause();
+              }
+            }
           }
           
           // Update tracking variables
@@ -122,6 +197,18 @@
         });
         
         songsGrid.appendChild(card);
+      });
+      
+      // Close video button
+      document.getElementById('close-video').addEventListener('click', () => {
+        const videoPlayer = document.getElementById('video-player');
+        const mediaContainer = document.getElementById('media-container');
+        
+        if (videoPlayer.src) {
+          videoPlayer.pause();
+        }
+        
+        mediaContainer.style.display = 'none';
       });
       
       // Initialize the first song
